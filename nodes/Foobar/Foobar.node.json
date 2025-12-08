@@ -1,0 +1,12 @@
+{
+	"node": "n8n-nodes-personal-cloud-tools.foobar",
+	"nodeVersion": 1,
+	"codexVersion": 1.0,
+	"categories": [
+		"Miscellaneous"
+	],
+	"resources": {
+		"credentialDocumentation": [],
+		"primaryDocumentation": []
+	}
+}

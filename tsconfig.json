@@ -18,8 +18,7 @@
 		"incremental": true,
 		"declaration": true,
 		"sourceMap": true,
-		"skipLibCheck": true,
-		"outDir": "./dist/"
+		"skipLibCheck": true
 	},
-	"include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json"]
+	"include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json", "index.ts"]
 }
