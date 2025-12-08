@@ -1,4 +1,5 @@
-import { Foobar } from './nodes/Foobar/Foobar.node';
+import { IcloudApi } from './credentials/IcloudApi.credentials';
+import { IcloudMedia } from './nodes/IcloudMedia/IcloudMedia.node';
 
-export const nodes = [Foobar];
-export const credentials = [];
+export const nodes = [IcloudMedia];
+export const credentials = [IcloudApi];

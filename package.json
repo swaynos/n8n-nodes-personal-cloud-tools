@@ -11,10 +11,20 @@
 	"main": "index.js",
 	"n8n": {
 		"n8nNodesApiVersion": 1,
-		"credentials": [],
+		"credentials": [
+			"credentials/IcloudApi.credentials.js"
+		],
 		"nodes": [
-			"nodes/Foobar/Foobar.node.js"
+			"nodes/IcloudMedia/IcloudMedia.node.js"
 		]
+	},
+	"dependencies": {
+		"apple-icloud": "*"
+	},
+	"overrides": {
+		"apple-icloud": {
+			"zlib": "npm:browserify-zlib@0.2.0"
+		}
 	},
 	"devDependencies": {
 		"@n8n/node-cli": "*",
