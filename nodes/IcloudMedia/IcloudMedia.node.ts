@@ -88,6 +88,19 @@ async function createIcloudClient(credentials: IcloudApiCredentials): Promise<an
 	return client;
 }
 
+function assertPhotosSession(client: any): void {
+	const hasWebservices = Boolean(client?.account?.webservices);
+	const hasCkDatabase = Boolean(client?.account?.webservices?.ckdatabasews);
+	if (hasWebservices && hasCkDatabase) return;
+
+	throw new Error(
+		[
+			'iCloud session is not ready for Photos (missing ckdatabasews endpoint).',
+			'Use a fresh iCloud browser Cookie header from the helper and ensure 2FA is already satisfied.',
+		].join(' '),
+	);
+}
+
 function normaliseAsset(asset: IDataObject): NormalisedAsset {
 	const rawMediaType =
 		(asset.item_type as string | undefined) ??
@@ -135,6 +148,8 @@ function coerceAssetArray(result: any, limit?: number): NormalisedAsset[] {
 }
 
 async function listPhotoAssets(client: any, limit?: number): Promise<NormalisedAsset[]> {
+	assertPhotosSession(client);
+
 	const photosService =
 		client?.photos ?? client?.Photos ?? client?.photo ?? client?.photosService ?? client?.PhotosService;
 

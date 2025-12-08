@@ -6,7 +6,8 @@
 		"n8n-community-node-package"
 	],
 	"scripts": {
-		"build": "tsc"
+		"build": "tsc",
+		"get-icloud-cookie": "node scripts/get-icloud-cookie.js"
 	},
 	"main": "index.js",
 	"n8n": {

@@ -36,6 +36,19 @@
       "remoteRoot": ".",
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run iCloud Cookie Helper",
+      "program": "${workspaceFolder}/scripts/get-icloud-cookie.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "env": {
+        "ICLOUD_LOGIN_URL": "https://www.icloud.com/",
+        "ICLOUD_COOKIE_DOMAIN": "icloud.com"
+      }
     }
   ]
 }
