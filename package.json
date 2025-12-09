@@ -20,12 +20,7 @@
 		]
 	},
 	"dependencies": {
-		"apple-icloud": "*"
-	},
-	"overrides": {
-		"apple-icloud": {
-			"zlib": "npm:browserify-zlib@0.2.0"
-		}
+		"icloudjs": "^1.6.2"
 	},
 	"devDependencies": {
 		"@n8n/node-cli": "*",

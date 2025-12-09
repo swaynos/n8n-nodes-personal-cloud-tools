@@ -3,53 +3,39 @@ import type { ICredentialType, INodeProperties } from 'n8n-workflow';
 export class IcloudApi implements ICredentialType {
 	name = 'icloudApi';
 	displayName = 'iCloud API';
-	// Using cookie-based auth keeps this credential non-interactive inside n8n.
 	properties: INodeProperties[] = [
 		{
-			displayName: 'iCloud Cookie Header',
-			name: 'cookie',
-			type: 'string',
-			default: '',
-			typeOptions: { rows: 4 },
-			description:
-				'Full Cookie header value from an authenticated icloud.com browser session (keep tokens like X-APPLE-WEBAUTH-TOKEN). Do NOT include the "Cookie:" prefix. Capture it locally by running "npm install --no-save playwright" then "npm run get-icloud-cookie" from this repo.',
-		},
-		{
-			displayName: 'Apple ID (Optional)',
+			displayName: 'Apple ID',
 			name: 'appleId',
 			type: 'string',
 			default: '',
-			description:
-				'Apple ID email used when no cookie is provided or when the session needs to be refreshed.',
+			required: true,
+			description: 'Apple ID email used with icloudjs.',
 		},
 		{
-			displayName: 'App Password (Optional)',
+			displayName: 'App-Specific Password',
 			name: 'appPassword',
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
 			description:
-				'App-specific password or account password used with Apple ID. Provide cookies to avoid 2FA prompts during unattended runs.',
+				'App-specific password for the Apple ID. If MFA is enforced, set trust on the device used to run this node so icloudjs can re-use the session.',
+		},
+		{
+			displayName: 'MFA Code (Optional)',
+			name: 'mfaCode',
+			type: 'string',
+			default: '',
+			description:
+				'Six-digit MFA code to satisfy a pending approval challenge. Leave empty normally; only required immediately after an MFA prompt.',
+		},
+		{
+			displayName: 'Trust This Device',
+			name: 'trustDevice',
+			type: 'boolean',
+			default: false,
+			description:
+				'Whether icloudjs should trust this device after MFA so future authentications skip code entry. Requires providing the MFA code once.',
 		},
 	];
-
-	authenticate = {
-		type: 'generic' as const,
-		properties: {
-			headers: {
-				Cookie: '={{ ($credentials.cookie || "").trim().replace(/^cookie\\s*:/i, "") }}',
-			},
-		},
-	};
-
-	test = {
-		request: {
-			method: 'GET' as const,
-			url: 'https://httpbin.org/headers',
-			headers: {
-				Accept: 'application/json',				
-				Cookie: '={{ ($credentials.cookie || "").trim().replace(/^cookie\\s*:/i, "") }}',
-			},
-		},
-	};
 }

@@ -9,9 +9,10 @@ import type {
 type MediaTypeFilter = 'all' | 'photo' | 'video';
 
 interface IcloudApiCredentials {
-	cookie?: string;
 	appleId?: string;
 	appPassword?: string;
+	mfaCode?: string;
+	trustDevice?: boolean;
 }
 
 type NormalisedAsset = IDataObject & {
@@ -23,161 +24,83 @@ type NormalisedAsset = IDataObject & {
 	raw?: IDataObject | undefined;
 };
 
-async function waitForReady(client: any): Promise<void> {
-	if (!client || typeof client.on !== 'function') return;
-	const emitter = client as { on: (event: string, handler: (...args: any[]) => void) => void };
-
-	const twoFactorEvents = ['2fa', '2FA', 'twoFactor', 'twoFactorAuthentication', 'requires2FA'];
-
-	await new Promise<void>((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error('Timed out waiting for iCloud session.')), 20000);
-
-		emitter.on('ready', () => {
-			clearTimeout(timeout);
-			resolve();
-		});
-
-		emitter.on('error', (error: Error) => {
-			clearTimeout(timeout);
-			reject(error);
-		});
-
-		for (const eventName of twoFactorEvents) {
-			emitter.on(eventName, () => {
-				clearTimeout(timeout);
-				reject(
-					new Error(
-						'Two-factor authentication is required. Provide a trusted cookie session to avoid interactive prompts.',
-					),
-				);
-			});
-		}
-	});
-}
-
-function normaliseCookieHeader(header?: string): string | undefined {
-	if (!header) return undefined;
-	const trimmed = header.trim();
-	if (trimmed.toLowerCase().startsWith('cookie:')) {
-		const [, value] = trimmed.split(':', 2);
-		return value?.trim() || undefined;
-	}
-	return trimmed || undefined;
-}
-
 async function createIcloudClient(credentials: IcloudApiCredentials): Promise<any> {
 	// eslint-disable-next-line @typescript-eslint/no-var-requires
-	const AppleIcloud = require('apple-icloud');
+	const IcloudJs = require('icloudjs');
+	const Icloud = IcloudJs.default ?? IcloudJs;
 
-	const options: Record<string, string> = {};
-	const cookie = normaliseCookieHeader(credentials.cookie);
-	if (cookie) options.cookie = cookie;
-	if (credentials.appleId) options.apple_id = credentials.appleId;
-	if (credentials.appPassword) options.password = credentials.appPassword;
+	const appleId = credentials.appleId?.trim();
+	const password = credentials.appPassword?.trim();
+	const mfaCode = credentials.mfaCode?.trim();
+	const trustDevice = Boolean(credentials.trustDevice);
 
-	const client = new AppleIcloud(options);
+	if (!appleId || !password) {
+		throw new Error('Apple ID and app-specific password are required for iCloud authentication.');
+	}
 
-	if (typeof client.login === 'function') {
-		await client.login();
-	} else if (typeof client.init === 'function') {
-		await client.init();
-	} else {
-		await waitForReady(client);
+	const client = new Icloud({
+		username: appleId,
+		password,
+		saveCredentials: false,
+		trustDevice,
+		authMethod: 'srp',
+		logger: 'Error',
+	});
+
+	await client.authenticate();
+
+	if (client.status === 'MfaRequested') {
+		if (!mfaCode) {
+			throw new Error(
+				'Multi-factor authentication is required. Approve the device and provide the six-digit MFA code in the credential, then retry.',
+			);
+		}
+		await client.provideMfaCode(mfaCode);
+	}
+
+	await client.awaitReady;
+
+	if (client.status !== 'Ready') {
+		throw new Error(`iCloud authentication did not complete. Status: ${client.status as string}`);
 	}
 
 	return client;
 }
 
-function assertPhotosSession(client: any): void {
-	const hasWebservices = Boolean(client?.account?.webservices);
-	const hasCkDatabase = Boolean(client?.account?.webservices?.ckdatabasews);
-	if (hasWebservices && hasCkDatabase) return;
-
-	throw new Error(
-		[
-			'iCloud session is not ready for Photos (missing ckdatabasews endpoint).',
-			'Use a fresh iCloud browser Cookie header from the helper and ensure 2FA is already satisfied.',
-		].join(' '),
-	);
-}
-
 function normaliseAsset(asset: IDataObject): NormalisedAsset {
-	const rawMediaType =
-		(asset.item_type as string | undefined) ??
-		(asset.media_type as string | undefined) ??
-		(asset.type as string | undefined) ??
-		(asset.mediaType as string | undefined);
+	const master = (asset as any)?.masterRecord as IDataObject;
+	const fields = (master?.fields as IDataObject) || {};
+	const hasVideoFields = Boolean(
+		(fields as any)?.resVidSmallRes || (fields as any)?.resVidMedRes || (fields as any)?.resVidFullRes,
+	);
 
 	return {
-		id:
-			(asset.id as string | undefined) ??
-			(asset.recordName as string | undefined) ??
-			(asset.guid as string | undefined) ??
-			(asset.uuid as string | undefined) ??
-			(asset.assetId as string | undefined),
-		filename: (asset.filename as string | undefined) ?? (asset.name as string | undefined),
-		mediaType: rawMediaType?.toLowerCase(),
-		created:
-			(asset.created as string | number | Date | null | undefined) ??
-			(asset.creationDate as string | number | Date | null | undefined) ??
-			(asset.dateCreated as string | number | Date | null | undefined) ??
-			(asset.creation_date as string | number | Date | null | undefined) ??
-			(asset.date as string | number | Date | null | undefined) ??
-			(asset.assetDate as string | number | Date | null | undefined) ??
-			null,
-		size:
-			(asset.size as number | string | null | undefined) ??
-			(asset.fileSize as number | string | null | undefined) ??
-			(asset.data_length as number | string | null | undefined) ??
-			null,
+		id: (asset as any).id ?? (master?.recordName as string | undefined),
+		filename: (asset as any).filename as string | undefined,
+		mediaType: hasVideoFields ? 'video' : 'photo',
+		created: (asset as any).assetDate ?? (asset as any).created ?? (asset as any).addedDate ?? null,
+		size: (asset as any).size ?? (fields as any)?.resOriginalRes?.value?.size ?? null,
 		raw: asset,
 	};
 }
 
-function coerceAssetArray(result: any, limit?: number): NormalisedAsset[] {
-	const candidates =
-		(Array.isArray(result) ? result : undefined) ??
-		result?.items ??
-		result?.assets ??
-		result?.data ??
-		result?.photos ??
-		[];
-	const entries = Array.isArray(candidates) ? candidates : [];
-	const slice = limit && limit > 0 ? entries.slice(0, limit) : entries;
-	return slice.map((entry) => normaliseAsset(entry as IDataObject));
-}
-
 async function listPhotoAssets(client: any, limit?: number): Promise<NormalisedAsset[]> {
-	assertPhotosSession(client);
+	const photosService = client.getService('photos');
+	if (!photosService) throw new Error('icloudjs did not expose a Photos service.');
 
-	const photosService =
-		client?.photos ?? client?.Photos ?? client?.photo ?? client?.photosService ?? client?.PhotosService;
+	const albums = await photosService.getAlbums();
+	const allAlbum =
+		photosService.all ??
+		(albums instanceof Map ? albums.values().next().value : undefined) ??
+		(Array.isArray(albums) ? albums[0] : undefined);
 
-	if (!photosService) {
-		throw new Error('apple-icloud client did not expose a Photos service.');
+	if (!allAlbum) {
+		throw new Error('No iCloud Photos album was returned.');
 	}
 
-	if (typeof photosService.list === 'function') {
-		return coerceAssetArray(await photosService.list({ limit }), limit);
-	}
-
-	if (typeof photosService.get === 'function') {
-		return coerceAssetArray(await photosService.get({ limit }), limit);
-	}
-
-	if (typeof photosService.getPhotos === 'function') {
-		return coerceAssetArray(await photosService.getPhotos({ limit }), limit);
-	}
-
-	if (typeof photosService.fetch === 'function') {
-		return coerceAssetArray(await photosService.fetch({ limit }), limit);
-	}
-
-	if (Array.isArray(photosService)) {
-		return coerceAssetArray(photosService, limit);
-	}
-
-	throw new Error('Unable to list iCloud Photos assets; unsupported apple-icloud version or API.');
+	const assets = await allAlbum.getPhotos();
+	const slice = limit && limit > 0 ? assets.slice(0, limit) : assets;
+	return slice.map((entry: IDataObject) => normaliseAsset(entry));
 }
 
 function filterByMediaType(items: NormalisedAsset[], filter: MediaTypeFilter): NormalisedAsset[] {
@@ -242,7 +165,7 @@ export class IcloudMedia implements INodeType {
 				name: 'includeRaw',
 				type: 'boolean',
 				default: false,
-				description: 'Whether to include the unmodified response from apple-icloud for each item',
+				description: 'Whether to include the unmodified response from icloudjs for each item',
 			},
 		],
 	};
