@@ -12,7 +12,7 @@ export class IcloudApi implements ICredentialType {
 			default: '',
 			typeOptions: { rows: 4 },
 			description:
-				'Full Cookie header from an authenticated icloud.com browser session (keep tokens like X-APPLE-WEBAUTH-TOKEN). Prefix "Cookie:" is optional. Capture it locally by running "npm install --no-save playwright" then "npm run get-icloud-cookie" from this repo.',
+				'Full Cookie header value from an authenticated icloud.com browser session (keep tokens like X-APPLE-WEBAUTH-TOKEN). Do NOT include the "Cookie:" prefix. Capture it locally by running "npm install --no-save playwright" then "npm run get-icloud-cookie" from this repo.',
 		},
 		{
 			displayName: 'Apple ID (Optional)',
@@ -37,7 +37,7 @@ export class IcloudApi implements ICredentialType {
 		type: 'generic' as const,
 		properties: {
 			headers: {
-				Cookie: '={{$credentials.cookie}}',
+				Cookie: '={{ ($credentials.cookie || "").trim().replace(/^cookie\\s*:/i, "") }}',
 			},
 		},
 	};
@@ -47,8 +47,8 @@ export class IcloudApi implements ICredentialType {
 			method: 'GET' as const,
 			url: 'https://httpbin.org/headers',
 			headers: {
-				Accept: 'application/json',
-				Cookie: '={{ $credentials.cookie.replace(/^cookie:\\s*/i, "") }}',
+				Accept: 'application/json',				
+				Cookie: '={{ ($credentials.cookie || "").trim().replace(/^cookie\\s*:/i, "") }}',
 			},
 		},
 	};
