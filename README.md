@@ -5,6 +5,12 @@
 **Current Node(s)**
 - `iCloud Media` (`nodes/IcloudMedia/IcloudMedia.node.ts`): lists iCloud Photos assets with filters for media type and limit; supports supplying an authenticated iCloud browser cookie via credential.
 
+**Cache iCloud results in a Data Store (avoid re-fetching everything)**
+- Create a Data Store (e.g. `icloud_media_cache`) with primary key `id`.
+- Refresh workflow (scheduled with Cron): iCloud Media node with `limit: 0` (all) and `includeRaw: false` -> Set node adding `syncedAt: {{$now}}` -> Data Store node set to Upsert, using `id` as the primary key. Optional cleanup: delete rows whose `syncedAt` is older than the current run to remove vanished items.
+- Read workflow: before hitting iCloud, check staleness (e.g. static data or a single-row Data Store holding `lastSyncAt`). If stale, call the refresh workflow via Execute Workflow. Then use Data Store “Get All” to read cached rows. If not stale, just “Get All” directly.
+- The iCloud node only fetches metadata (not file bytes), so the Data Store rows stay small even for large libraries.
+
 **Dev Machine + n8n Setup**
 - n8n is assumed on an external volume, example:`/Volumes/External/Dev/n8n`.
 - Custom community nodes are loaded from `~/.n8n/custom/node_modules`. Keep that prefix lightweight with a minimal `package.json` (e.g., `{ "private": true }`).
